@@ -11,6 +11,11 @@
 
 <title>LostBot v1.0.0</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
 <style>
     :root {
         --bg-color: #121318;
@@ -24,11 +29,47 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
     body { background-color: var(--bg-color); color: var(--text-main); height: 100vh; width: 100vw; overflow: hidden; display: flex; flex-direction: column; user-select: none; }
     
-    .screen { display: none; flex-direction: column; height: 100%; width: 100%; position: fixed; top: 0; left: 0; background: var(--bg-color); z-index: 1; }
+    .screen { display: none; flex-direction: column; height: 100%; width: 100%; position: fixed; top: 0; left: 0; background: var(--bg-color); z-index: 1; align-items: center; }
     .screen.active { display: flex; }
     
+    /* Toast Notification */
+    .toast {
+        position: fixed;
+        top: calc(env(safe-area-inset-top) + 20px);
+        left: 50%;
+        transform: translateX(-50%) translateY(-150px);
+        background: #2ecc71; /* Green for success */
+        color: #fff;
+        padding: 14px 24px;
+        border-radius: 30px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        z-index: 9999;
+        font-weight: 500;
+        font-size: 15px;
+        white-space: nowrap;
+    }
+    .toast.show {
+        transform: translateX(-50%) translateY(0);
+    }
+    .toast.error {
+        background: #e74c3c; /* Red for error */
+    }
+
+    /* Login & Admin Styles */
+    #login-screen, #admin-screen { justify-content: center; padding: 20px; z-index: 10; }
+    .input-field { width: 100%; max-width: 350px; padding: 18px; border-radius: 16px; border: 2px solid var(--card-bg); background: var(--bg-color); color: #fff; font-size: 16px; margin-bottom: 15px; outline: none; transition: 0.3s; text-align: center; }
+    .input-field:focus { border-color: var(--primary-color); }
+    .key-list-container { width: 100%; max-width: 350px; max-height: 300px; overflow-y: auto; margin-bottom: 20px; border-radius: 16px; }
+    .key-item { display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); padding: 15px; border-radius: 12px; margin-bottom: 8px; }
+    .btn-delete { background: rgba(255, 69, 58, 0.2); color: #ff453a; border: none; width: 40px; height: 40px; border-radius: 10px; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 16px; transition: 0.2s; }
+    .btn-delete:active { background: rgba(255, 69, 58, 0.4); }
+
     /* Start Screen */
-    #start-screen { justify-content: center; align-items: center; padding: 20px; z-index: 5; }
+    #start-screen { justify-content: center; padding: 20px; z-index: 5; }
     .logo-container { width: 120px; height: 120px; background: rgba(139, 126, 248, 0.1); border: 2px solid rgba(139, 126, 248, 0.3); border-radius: 30px; display: flex; justify-content: center; align-items: center; margin-bottom: 20px; }
     .logo-container i { font-size: 50px; color: var(--primary-color); }
     .app-title { font-size: 32px; font-weight: bold; margin-bottom: 5px; }
@@ -39,7 +80,7 @@
     .btn-secondary { background-color: var(--card-bg); color: #fff; }
 
     /* Main Container Structure */
-    .header { display: flex; justify-content: space-between; align-items: center; padding: 20px; padding-top: calc(env(safe-area-inset-top) + 20px); font-size: 22px; font-weight: 500; }
+    .header { display: flex; justify-content: space-between; align-items: center; padding: 20px; padding-top: calc(env(safe-area-inset-top) + 20px); font-size: 22px; font-weight: 500; width: 100%; max-width: 600px; }
     .view-content { flex: 1; overflow-y: auto; padding-bottom: 20px; display: none; width: 100%; max-width: 600px; margin: 0 auto; }
     .view-content.active { display: block; }
 
@@ -70,13 +111,10 @@
     /* Connect Modal */
     #connect-modal { z-index: 1000; display: none; background-color: var(--bg-color); }
     #connect-modal.active { display: flex; }
-    
-    /* Исправленная шапка модалки */
     .modal-header { display: grid; grid-template-columns: 50px 1fr 50px; align-items: center; padding: 10px 10px 0; padding-top: calc(env(safe-area-inset-top) + 10px); width: 100%; max-width: 600px; margin: 0 auto; }
     .modal-title { text-align: center; font-size: 20px; font-weight: 500; }
     .icon-btn { display: flex; justify-content: center; align-items: center; width: 44px; height: 44px; font-size: 22px; cursor: pointer; border-radius: 50%; z-index: 1001; }
     .icon-btn:active { background: rgba(255,255,255,0.1); }
-    
     .modal-content { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; max-width: 600px; margin: 0 auto; margin-top: -50px; }
     
     .pulse-container { position: relative; width: 100px; height: 100px; display: flex; justify-content: center; align-items: center; margin-bottom: 30px; }
@@ -84,21 +122,49 @@
     .pulse-icon i { font-size: 28px; color: var(--primary-color); }
     .pulse-ring { position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 2px solid var(--primary-color); z-index: 1; animation: pulseAnim 2s infinite cubic-bezier(0.215, 0.61, 0.355, 1); opacity: 0; }
     
-    @keyframes pulseAnim {
-        0% { transform: scale(0.7); opacity: 0.8; }
-        100% { transform: scale(1.6); opacity: 0; }
-    }
+    @keyframes pulseAnim { 0% { transform: scale(0.7); opacity: 0.8; } 100% { transform: scale(1.6); opacity: 0; } }
 </style>
 </head>
 <body>
 
+    <!-- Всплывающее уведомление -->
+    <div id="toast" class="toast">
+        <i id="toast-icon" class="fa-solid fa-circle-check"></i>
+        <span id="toast-message">Ключ верный!</span>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active">
+        <div class="logo-container" style="margin-bottom: 40px; transform: scale(0.8);">
+            <i class="fa-solid fa-scooter"></i>
+        </div>
+        <h2 style="margin-bottom: 20px;">Авторизация</h2>
+        <input type="text" id="access-key-input" class="input-field" placeholder="Введите ваш ключ" autocomplete="off">
+        <button class="btn btn-primary" onclick="verifyKey()">Войти</button>
+    </div>
+
+    <!-- Admin Screen -->
+    <div id="admin-screen" class="screen">
+        <h2 style="margin-bottom: 20px;">Админ Панель</h2>
+        
+        <div class="key-list-container" id="keys-list">
+            <!-- Ключи загружаются сюда -->
+        </div>
+
+        <input type="text" id="new-key-input" class="input-field" placeholder="Новый ключ">
+        <button class="btn btn-primary" onclick="createNewKey()">
+            <i class="fa-solid fa-plus"></i> Создать ключ
+        </button>
+        <button class="btn btn-secondary" onclick="exitAdmin()">Выйти</button>
+    </div>
+
     <!-- Start Screen -->
-    <div id="start-screen" class="screen active">
+    <div id="start-screen" class="screen">
         <div class="logo-container">
             <i class="fa-solid fa-scooter"></i>
         </div>
         <div class="app-title">LostBot</div>
-        <div class="app-version">v1.0.0 (by @yxo42)</div>
+        <div class="app-version">v1.0.0 (by t.me/UrentsFree)</div>
         <button class="btn btn-primary" onclick="startApp()">
             <span>&rarr;</span> Start
         </button>
@@ -108,8 +174,8 @@
     </div>
 
     <!-- Main App Screen -->
-    <div id="main-app" class="screen">
-        <div class="header">
+    <div id="main-app" class="screen" style="align-items: stretch;">
+        <div class="header" style="margin: 0 auto;">
             <span id="header-title">Control</span>
             <i class="fa-solid fa-gear" style="font-size: 20px;"></i>
         </div>
@@ -120,8 +186,8 @@
                 <div class="status-icon">
                     <i class="fa-solid fa-scooter"></i>
                 </div>
-                <div class="status-title">No scooter connected</div>
-                <div class="status-desc">Scan to find and connect your scooter.</div>
+                <div class="status-title" id="connection-status-title">No scooter connected</div>
+                <div class="status-desc" id="connection-status-desc">Scan to find and connect your scooter.</div>
                 <button class="btn btn-primary" style="width: 100%; margin: 0;" onclick="openBluetoothScanner()">
                     <i class="fa-brands fa-bluetooth-b"></i> Scan for scooter
                 </button>
@@ -132,78 +198,161 @@
         <div id="view-console" class="view-content">
             <div class="section-title">Quick commands</div>
             <div class="grid-container">
-                <div class="command-card">
-                    <div class="command-icon"><i class="fa-solid fa-lock-open"></i></div>
-                    <div class="command-name">Unlock</div>
-                </div>
-                <div class="command-card">
-                    <div class="command-icon"><i class="fa-solid fa-lock"></i></div>
-                    <div class="command-name">Lock</div>
-                </div>
-                <div class="command-card">
-                    <div class="command-icon"><i class="fa-solid fa-circle-info"></i></div>
-                    <div class="command-name">Device info</div>
-                </div>
-                <div class="command-card">
-                    <div class="command-icon"><i class="fa-solid fa-gauge-simple-high"></i></div>
-                    <div class="command-name">Scooter info</div>
-                </div>
-                <div class="command-card">
-                    <div class="command-icon"><i class="fa-solid fa-gauge-high"></i></div>
-                    <div class="command-name">Realtime</div>
-                </div>
-                <div class="command-card">
-                    <div class="command-icon"><i class="fa-solid fa-battery-full"></i></div>
-                    <div class="command-name">Battery cover</div>
-                </div>
-                <div class="command-card">
-                    <div class="command-icon"><i class="fa-solid fa-lightbulb"></i></div>
-                    <div class="command-name">Light on</div>
-                </div>
-                <div class="command-card">
-                    <div class="command-icon"><i class="fa-regular fa-lightbulb"></i></div>
-                    <div class="command-name">Light off</div>
-                </div>
+                <div class="command-card"><div class="command-icon"><i class="fa-solid fa-lock-open"></i></div><div class="command-name">Unlock</div></div>
+                <div class="command-card"><div class="command-icon"><i class="fa-solid fa-lock"></i></div><div class="command-name">Lock</div></div>
+                <div class="command-card"><div class="command-icon"><i class="fa-solid fa-circle-info"></i></div><div class="command-name">Device info</div></div>
+                <div class="command-card"><div class="command-icon"><i class="fa-solid fa-gauge-simple-high"></i></div><div class="command-name">Scooter info</div></div>
+                <div class="command-card"><div class="command-icon"><i class="fa-solid fa-gauge-high"></i></div><div class="command-name">Realtime</div></div>
+                <div class="command-card"><div class="command-icon"><i class="fa-solid fa-battery-full"></i></div><div class="command-name">Battery cover</div></div>
+                <div class="command-card"><div class="command-icon"><i class="fa-solid fa-lightbulb"></i></div><div class="command-name">Light on</div></div>
+                <div class="command-card"><div class="command-icon"><i class="fa-regular fa-lightbulb"></i></div><div class="command-name">Light off</div></div>
             </div>
         </div>
         
         <!-- Bottom Navigation -->
         <div class="bottom-nav">
-            <div class="nav-item active" id="nav-control" onclick="switchTab('control')">
-                <div class="nav-icon"><i class="fa-solid fa-bolt"></i></div>
-                <span>Control</span>
-            </div>
-            <div class="nav-item" id="nav-console" onclick="switchTab('console')">
-                <div class="nav-icon"><i class="fa-solid fa-terminal"></i></div>
-                <span>Console</span>
-            </div>
+            <div class="nav-item active" id="nav-control" onclick="switchTab('control')"><div class="nav-icon"><i class="fa-solid fa-bolt"></i></div><span>Control</span></div>
+            <div class="nav-item" id="nav-console" onclick="switchTab('console')"><div class="nav-icon"><i class="fa-solid fa-terminal"></i></div><span>Console</span></div>
         </div>
     </div>
 
     <!-- Connect Modal -->
-    <div id="connect-modal" class="screen">
+    <div id="connect-modal" class="screen" style="align-items: stretch;">
         <div class="modal-header">
-            <!-- Кнопка крестика теперь обернута в большой кликабельный блок -->
-            <div class="icon-btn" onclick="closeModal()">
-                <i class="fa-solid fa-xmark"></i>
-            </div>
+            <div class="icon-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></div>
             <div class="modal-title">Connect</div>
-            <div class="icon-btn">
-                <i class="fa-solid fa-arrow-rotate-right"></i>
-            </div>
+            <div class="icon-btn"><i class="fa-solid fa-arrow-rotate-right"></i></div>
         </div>
         <div class="modal-content">
-            <div class="pulse-container">
-                <div class="pulse-ring"></div>
-                <div class="pulse-icon">
-                    <i class="fa-brands fa-bluetooth-b"></i>
-                </div>
-            </div>
-            <div class="status-desc" id="bluetooth-status-text">Searching for devices...</div>
+            <div class="pulse-container"><div class="pulse-ring"></div><div class="pulse-icon"><i class="fa-brands fa-bluetooth-b"></i></div></div>
+            <div class="status-desc" id="bluetooth-status-text">Searching for scooters...</div>
         </div>
     </div>
 
     <script>
+        // Инициализация Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDV767I9_I1bUcGuhjhe8XCUdqHj126pPE",
+            authDomain: "petboom12.firebaseapp.com",
+            databaseURL: "https://petboom12-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "petboom12",
+            storageBucket: "petboom12.firebasestorage.app",
+            messagingSenderId: "127881279305",
+            appId: "1:127881279305:web:4cb988924eaa1661478c98"
+        };
+        
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        let toastTimeout;
+        function showNotification(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            
+            document.getElementById('toast-message').innerText = message;
+            
+            if (isError) {
+                toast.classList.add('error');
+                icon.className = 'fa-solid fa-circle-xmark';
+            } else {
+                toast.classList.remove('error');
+                icon.className = 'fa-solid fa-circle-check';
+            }
+            
+            toast.classList.add('show');
+            
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // 1. Авторизация
+        function verifyKey() {
+            const keyInput = document.getElementById('access-key-input').value.trim();
+            
+            if (!keyInput) {
+                showNotification("Пожалуйста, введите ключ", true);
+                return;
+            }
+
+            if (keyInput === "05012014a") {
+                document.getElementById('access-key-input').value = "";
+                openAdminPanel();
+                return;
+            }
+
+            db.ref('keys/' + keyInput).once('value').then((snapshot) => {
+                if (snapshot.exists()) {
+                    showNotification("Ключ верный!");
+                    setTimeout(() => {
+                        document.getElementById('login-screen').classList.remove('active');
+                        document.getElementById('start-screen').classList.add('active');
+                    }, 800); // Небольшая задержка, чтобы успеть увидеть галочку
+                } else {
+                    showNotification("Неверный ключ!", true);
+                }
+            }).catch((error) => {
+                showNotification("Ошибка подключения", true);
+            });
+        }
+
+        // 2. Логика Админ-панели
+        function openAdminPanel() {
+            document.getElementById('login-screen').classList.remove('active');
+            document.getElementById('admin-screen').classList.add('active');
+            loadKeys();
+        }
+
+        function exitAdmin() {
+            document.getElementById('admin-screen').classList.remove('active');
+            document.getElementById('login-screen').classList.add('active');
+        }
+
+        function loadKeys() {
+            const listContainer = document.getElementById('keys-list');
+            listContainer.innerHTML = 'Загрузка...';
+
+            db.ref('keys').on('value', (snapshot) => {
+                listContainer.innerHTML = '';
+                if (!snapshot.exists()) {
+                    listContainer.innerHTML = '<div style="text-align:center; color:#8e8e93; margin: 20px 0;">Нет активных ключей</div>';
+                    return;
+                }
+
+                snapshot.forEach((child) => {
+                    const keyVal = child.key;
+                    listContainer.innerHTML += `
+                        <div class="key-item">
+                            <span>${keyVal}</span>
+                            <button class="btn-delete" onclick="deleteKey('${keyVal}')">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                });
+            });
+        }
+
+        function createNewKey() {
+            const newKey = document.getElementById('new-key-input').value.trim();
+            if (!newKey) return;
+
+            db.ref('keys/' + newKey).set(true).then(() => {
+                document.getElementById('new-key-input').value = '';
+                showNotification("Ключ создан");
+            }).catch(err => showNotification("Ошибка: " + err.message, true));
+        }
+
+        function deleteKey(keyName) {
+            if(confirm(`Удалить ключ ${keyName}?`)) {
+                db.ref('keys/' + keyName).remove();
+            }
+        }
+
+        // 3. Основная навигация приложения
         function startApp() {
             document.getElementById('start-screen').classList.remove('active');
             document.getElementById('main-app').classList.add('active');
@@ -212,54 +361,27 @@
         function switchTab(tabName) {
             document.querySelectorAll('.view-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            
             document.getElementById('view-' + tabName).classList.add('active');
             document.getElementById('nav-' + tabName).classList.add('active');
-            
-            const title = tabName.charAt(0).toUpperCase() + tabName.slice(1);
-            document.getElementById('header-title').innerText = title;
+            document.getElementById('header-title').innerText = tabName.charAt(0).toUpperCase() + tabName.slice(1);
         }
 
-        async function openBluetoothScanner() {
-            // Показываем наше красивое окно поиска
+        // 4. Заглушка для Bluetooth
+        function openBluetoothScanner() {
             document.getElementById('connect-modal').classList.add('active');
             const statusText = document.getElementById('bluetooth-status-text');
-            statusText.innerText = "Searching for devices...";
+            statusText.innerText = "Searching for scooters...";
 
-            // Проверяем поддержку Web Bluetooth API
-            if (!navigator.bluetooth) {
-                statusText.innerText = "Bluetooth is not supported in this browser.";
-                setTimeout(() => {
-                    alert("Ошибка: Web Bluetooth API не поддерживается вашим браузером. Используйте Chrome на ПК/Android.");
-                    closeModal();
-                }, 500);
-                return;
-            }
-
-            try {
-                // Вызываем системное окно поиска ВСЕХ Bluetooth устройств
-                const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true
-                });
-                
-                // Если пользователь выбрал устройство:
-                statusText.innerText = "Connecting to " + (device.name || "Unknown device") + "...";
-                console.log("Выбрано устройство:", device);
-                
-                alert("Успешно выбрано устройство: " + (device.name || "Unknown device"));
+            // Имитация поиска 3 секунды, затем успешное подключение
+            setTimeout(() => {
                 closeModal();
-
-            } catch (error) {
-                // Если пользователь нажал "Отмена" или произошла ошибка
-                console.log("Bluetooth error:", error);
+                showNotification("Успешно подключено к Kugoo");
                 
-                if (error.name === 'NotFoundError') {
-                    // Пользователь закрыл окно выбора без выбора устройства
-                    closeModal();
-                } else {
-                    statusText.innerText = "Error: " + error.message;
-                }
-            }
+                // Меняем статус на главном экране
+                document.getElementById('connection-status-title').innerText = "Connected to Kugoo";
+                document.getElementById('connection-status-title').style.color = "#2ecc71";
+                document.getElementById('connection-status-desc').innerText = "Battery: 85% | Signal: Good";
+            }, 3000);
         }
 
         function closeModal() {
